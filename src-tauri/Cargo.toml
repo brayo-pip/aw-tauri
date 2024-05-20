@@ -10,10 +10,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "1.5.1", features = [] }
+tauri-build = { version = "2.0.0-beta", features = [] }
 
 [dependencies]
-tauri = { version = "1.6", features = ["shell-open", "system-tray"] }
+tauri = { version = "2.0.0-beta", features = ["tray-icon"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lazy_static = "1.4"
@@ -23,6 +23,7 @@ nix = { version = "0.28.0", features = ["process", "signal"] }
 winapi = { version = "0.3", features = ["winuser"] }
 aw-server = { git = "https://github.com/ActivityWatch/aw-server-rust.git", branch = "master" }
 aw-datastore = { git = "https://github.com/ActivityWatch/aw-server-rust.git", branch = "master" }
+tauri-plugin-shell = "2.0.0-beta.5"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem

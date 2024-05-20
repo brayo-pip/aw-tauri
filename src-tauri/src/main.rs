@@ -50,6 +50,7 @@ fn main() {
     let manager_state = manager::start_manager();
     let tray = create_tray(&manager_state);
     tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             init_app_handle(app.handle().clone());
             let webui_var = std::env::var("AW_WEBUI_DIR");
