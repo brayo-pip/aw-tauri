@@ -20,7 +20,8 @@ use std::sync::{
     Arc, Mutex,
 };
 use std::{env, fs, thread};
-use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu};
+use tauri::menu::{MenuBuilder, MenuItem, MenuItemBuilder, SubmenuBuilder};
+use tauri::tray::TrayIconBuilder;
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]
@@ -71,38 +72,6 @@ impl ManagerState {
         self.update_tray_menu();
     }
     fn update_tray_menu(&mut self) {
-        let open = CustomMenuItem::new("open".to_string(), "Open");
-        let quit = CustomMenuItem::new("quit".to_string(), "Quit");
-        let mut module_menu = SystemTrayMenu::new();
-
-        for (module, running) in self.modules_running.iter() {
-            let label = format!(
-                "{} ({})",
-                module,
-                if *running { "Running" } else { "Stopped" }
-            );
-            let status = if *running { "Stop" } else { "Start" };
-            let menu = SystemTrayMenu::new().add_item(CustomMenuItem::new(module, status));
-            let submenu = SystemTraySubmenu::new(label, menu);
-            module_menu = module_menu.add_submenu(submenu)
-        }
-
-        for module in self.modules_in_path.iter() {
-            if !self.modules_running.contains_key(module) {
-                let menu = SystemTrayMenu::new().add_item(CustomMenuItem::new(module, "Start"));
-                let submenu = SystemTraySubmenu::new(module, menu);
-                module_menu = module_menu.add_submenu(submenu);
-            }
-        }
-
-        let module_submenu = SystemTraySubmenu::new("Modules", module_menu);
-        let menu = SystemTrayMenu::new()
-            .add_item(open)
-            .add_native_item(SystemTrayMenuItem::Separator)
-            .add_submenu(module_submenu)
-            .add_native_item(SystemTrayMenuItem::Separator)
-            .add_item(quit);
-
         let (lock, cvar) = &*HANDLE_CONDVAR;
         let mut state = lock.lock().unwrap();
 
@@ -110,9 +79,62 @@ impl ManagerState {
             state = cvar.wait(state).unwrap();
         }
 
-        let app = get_app_handle().lock().expect("failed to get app handle");
-        let tray_handle = app.tray_handle();
-        tray_handle.set_menu(menu).expect("failed to set tray menu");
+        let app = &*get_app_handle().lock().expect("failed to get app handle");
+        // let open = MenuItemBuilder::new("Open").build(app);
+        // let open = MenuItem()
+        let open = MenuItem::new(app, "Open", true, None::<&str>).unwrap();
+        let quit = MenuItem::new(app, "Quit", true, None::<&str>).unwrap();
+
+      
+
+        let mut submenu = SubmenuBuilder::new(app, "modules").build().unwrap();
+
+    
+        let menu = MenuBuilder::new(app)
+        .item(&open)
+        .item(&submenu)
+        .item(&quit)
+        .build()
+        .unwrap();
+
+
+        // let open = CustomMenuItem::new("open".to_string(), "Open");
+        // let open = MenuItemBuilder::new(app)
+        //     .label("Open")
+        //     .build();
+        // let quit = CustomMenuItem::new("quit".to_string(), "Quit");
+        // let mut module_menu = SystemTrayMenu::new();
+
+        // for (module, running) in self.modules_running.iter() {
+        //     let label = format!(
+        //         "{} ({})",
+        //         module,
+        //         if *running { "Running" } else { "Stopped" }
+        //     );
+        //     let status = if *running { "Stop" } else { "Start" };
+        //     let menu = SystemTrayMenu::new().add_item(CustomMenuItem::new(module, status));
+        //     let submenu = SystemTraySubmenu::new(label, menu);
+        //     module_menu = module_menu.add_submenu(submenu)
+        // }
+
+        // for module in self.modules_in_path.iter() {
+        //     if !self.modules_running.contains_key(module) {
+        //         let menu = SystemTrayMenu::new().add_item(CustomMenuItem::new(module, "Start"));
+        //         let submenu = SystemTraySubmenu::new(module, menu);
+        //         module_menu = module_menu.add_submenu(submenu);
+        //     }
+        // }
+
+        // let module_submenu = SystemTraySubmenu::new("Modules", module_menu);
+        // let menu = SystemTrayMenu::new()
+        //     .add_item(open)
+        //     .add_native_item(SystemTrayMenuItem::Separator)
+        //     .add_submenu(module_submenu)
+        //     .add_native_item(SystemTrayMenuItem::Separator)
+        //     .add_item(quit);
+
+        
+        app.tray_by_id("default").unwrap().set_menu(Some(menu));
     }
     pub fn start_module(&self, name: &str) {
         if !self.is_module_running(name) {
