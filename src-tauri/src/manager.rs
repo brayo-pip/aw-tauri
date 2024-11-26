@@ -22,7 +22,6 @@ use std::sync::{
 use std::{env, fs, thread};
 use tauri::menu::{Menu, MenuItem, SubmenuBuilder};
 
-// use tauri::{CustomMenuItem, SystemTrayMenu, SystemTrayMenuItem, SystemTraySubmenu};
 #[cfg(windows)]
 use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]
@@ -294,7 +293,6 @@ fn get_modules_in_path() -> BTreeSet<String> {
         }
     }
     set.remove("awk"); // common in most unix systems
-    set.remove("aw-tauri");
 
     set
 }
