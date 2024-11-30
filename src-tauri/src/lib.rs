@@ -41,12 +41,13 @@ fn greet(name: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let aw_port: u16 = 5699;
     tauri::Builder::default()
+        .plugin(tauri_plugin_localhost::Builder::new(aw_port.clone()).build())
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             println!("Another instance is running, quitting!");
         }))
         .setup(|app| {
-            #[cfg(debug_assertions)]
             {
                 let testing = true;
                 let legacy_import = false;
