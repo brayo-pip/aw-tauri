@@ -192,7 +192,12 @@ pub fn start_manager() -> Arc<Mutex<ManagerState>> {
 
     // TODO: make this configurable
     // Start the modules
-    let autostart_modules = ["aw-watcher-afk", "aw-watcher-window", "awatcher", "aw-awatcher"];
+    let autostart_modules = [
+        "aw-watcher-afk",
+        "aw-watcher-window",
+        "awatcher",
+        "aw-awatcher",
+    ];
     for module in autostart_modules.iter() {
         state.lock().unwrap().start_module(module);
     }
@@ -284,7 +289,9 @@ fn get_modules_in_path() -> BTreeSet<String> {
                         path.push("bin");
                         let path = path.into_os_string().into_string().unwrap();
                         env::set_var("PATH", format!("{}:{}", env::var("PATH").unwrap(), path));
-                        fs::read_dir(path).unwrap_or_else(|_| fs::read_dir("/dev/null").unwrap()).filter_map(Result::ok)
+                        fs::read_dir(path)
+                            .unwrap_or_else(|_| fs::read_dir("/dev/null").unwrap())
+                            .filter_map(Result::ok)
                     });
 
                     for entry in entries.into_iter().chain(user_entries) {
