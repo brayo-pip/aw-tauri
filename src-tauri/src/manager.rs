@@ -192,7 +192,12 @@ pub fn start_manager() -> Arc<Mutex<ManagerState>> {
 
     // TODO: make this configurable
     // Start the modules
-    let autostart_modules = ["aw-watcher-afk", "aw-watcher-window"];
+    let autostart_modules = [
+        "aw-watcher-afk",
+        "aw-watcher-window",
+        "awatcher",
+        "aw-awatcher",
+    ];
     for module in autostart_modules.iter() {
         state.lock().unwrap().start_module(module);
     }
@@ -236,7 +241,7 @@ fn handle(rx: Receiver<ModuleMessage>, state: Arc<Mutex<ManagerState>>) {
 fn start_module_thread(name: String, tx: Sender<ModuleMessage>) {
     thread::spawn(move || {
         // Start the child process
-        let args = ["--testing", "--port", "5699"];
+        let args = ["--port", "5699"];
         let child = Command::new(&name)
             .args(args)
             .stdout(std::process::Stdio::piped())
@@ -276,15 +281,32 @@ fn get_modules_in_path() -> BTreeSet<String> {
     if let Some(paths) = env::var_os("PATH") {
         for path in env::split_paths(&paths) {
             if let Ok(entries) = fs::read_dir(&path) {
-                for entry in entries.flatten() {
-                    if let Ok(metadata) = entry.metadata() {
-                        if (metadata.is_file() || metadata.is_symlink())
-                            && metadata.permissions().mode() & 0o111 != 0
-                        {
-                            if let Some(file_name) = entry.file_name().to_str() {
-                                if file_name.starts_with("aw") && !file_name.contains(".") {
-                                    // starts with aw and doesn't have an extension
-                                    set.insert(file_name.to_string());
+                // append /home/$USER/bin path for each user to entries
+                let entries: Vec<_> = entries.filter_map(Result::ok).collect();
+                if let Ok(user_entries) = fs::read_dir("/home") {
+                    let user_entries = user_entries.filter_map(Result::ok).flat_map(|entry| {
+                        let mut path = entry.path();
+                        path.push("bin");
+                        let path = path.into_os_string().into_string().unwrap();
+                        env::set_var("PATH", format!("{}:{}", env::var("PATH").unwrap(), path));
+                        fs::read_dir(path)
+                            .unwrap_or_else(|_| fs::read_dir("/dev/null").unwrap())
+                            .filter_map(Result::ok)
+                    });
+
+                    for entry in entries.into_iter().chain(user_entries) {
+                        if let Ok(metadata) = entry.metadata() {
+                            if (metadata.is_file() || metadata.is_symlink())
+                                && metadata.permissions().mode() & 0o111 != 0
+                            {
+                                if let Some(file_name) = entry.file_name().to_str() {
+                                    if file_name.starts_with("aw") && !file_name.contains(".") {
+                                        // starts with aw and doesn't have an extension
+                                        if file_name == "aw-tauri" {
+                                            println!("{:?}", entry.path());
+                                        }
+                                        set.insert(file_name.to_string());
+                                    }
                                 }
                             }
                         }
@@ -293,7 +315,9 @@ fn get_modules_in_path() -> BTreeSet<String> {
             }
         }
     }
+
     set.remove("awk"); // common in most unix systems
+    set.remove("aw-tauri");
 
     set
 }
