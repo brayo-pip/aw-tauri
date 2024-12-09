@@ -19,6 +19,10 @@ use std::sync::{
     mpsc::{channel, Receiver, Sender},
     Arc, Mutex,
 };
+use std::time::Duration;
+// use std::thread::sleep;
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
+
 use std::{env, fs, thread};
 use tauri::menu::{Menu, MenuItem, SubmenuBuilder};
 
@@ -28,7 +32,7 @@ use winapi::shared::minwindef::DWORD;
 #[cfg(windows)]
 use winapi::um::wincon::{GenerateConsoleCtrlEvent, CTRL_BREAK_EVENT};
 
-use crate::{get_app_handle, get_tray_id, HANDLE_CONDVAR};
+use crate::{get_app_handle, get_config, get_tray_id, HANDLE_CONDVAR};
 
 #[derive(Debug)]
 pub enum ModuleMessage {
@@ -190,9 +194,8 @@ pub fn start_manager() -> Arc<Mutex<ManagerState>> {
     let (tx, rx) = channel();
     let state = Arc::new(Mutex::new(ManagerState::new(tx.clone())));
 
-    // TODO: make this configurable
     // Start the modules
-    let autostart_modules = ["aw-watcher-afk", "aw-watcher-window"];
+    let autostart_modules = &*get_config().autostart_modules;
     for module in autostart_modules.iter() {
         state.lock().unwrap().start_module(module);
     }
@@ -213,6 +216,7 @@ pub fn start_manager() -> Arc<Mutex<ManagerState>> {
 fn handle(rx: Receiver<ModuleMessage>, state: Arc<Mutex<ManagerState>>) {
     loop {
         let msg = rx.recv().unwrap();
+        let state_clone = Arc::clone(&state);
         let state = &mut state.lock().unwrap();
         match msg {
             ModuleMessage::Started { name, pid } => {
@@ -220,9 +224,24 @@ fn handle(rx: Receiver<ModuleMessage>, state: Arc<Mutex<ManagerState>>) {
             }
             ModuleMessage::Stopped { name, output } => {
                 state.stopped_module(&name);
+                let name_clone = name.clone();
                 if output.status.success() {
                     println!("{name} exited successfully");
                 } else {
+                    thread::spawn(move || {
+                        thread::sleep(Duration::from_secs(1));
+                        let state = &mut state_clone.lock().unwrap();
+                        state.start_module(&name_clone);
+                    });
+
+                    let app = &*get_app_handle().lock().expect("failed to get app handle");
+
+                    app.dialog()
+                        .message(format!("{name} crashed. Restarting..."))
+                        .kind(MessageDialogKind::Error)
+                        .title("Warning")
+                        .show(|_| {});
+
                     println!("{name} exited with error");
                     println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
                     println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
@@ -236,7 +255,8 @@ fn handle(rx: Receiver<ModuleMessage>, state: Arc<Mutex<ManagerState>>) {
 fn start_module_thread(name: String, tx: Sender<ModuleMessage>) {
     thread::spawn(move || {
         // Start the child process
-        let args = ["--testing", "--port", "5699"];
+        let port_string = get_config().port.to_string();
+        let args = ["--port", port_string.as_str()];
         let child = Command::new(&name)
             .args(args)
             .stdout(std::process::Stdio::piped())
